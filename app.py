@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import kagglehub
 import os
+os.environ["KAGGLE_API_TOKEN"] = st.secrets["KAGGLE_API_TOKEN"]
+import kagglehub
 
 DATE_COLUMN = 'Start_Time'
 
