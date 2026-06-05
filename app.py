@@ -25,7 +25,7 @@ st.text(""" Este conjunto de datos contiene informaci√≥n sobre accidentes de tr√
 
 # Cargar datos
 data_load_state = st.text('Cargando datos...')
-data = load_data(500000)
+data = load_data(100000)
 data_load_state.success('Datos cargados correctamente')
 
 # Mostrar datos
