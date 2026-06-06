@@ -4,21 +4,13 @@ import numpy as np
 import os
 from preprocessing import preprocess_data
 
-try:
-    os.environ["KAGGLE_API_TOKEN"] = st.secrets["KAGGLE_API_TOKEN"]
-except:
-    os.environ["KAGGLE_API_TOKEN"] = "KGAT_6982f2553b685ee4e9b9acb994bfd776"
-import kagglehub
-
 st.set_page_config( page_title="US Accidents Dashboard", page_icon="🚗", layout="wide")
 
 DATE_COLUMN = 'Start_Time'
 
 @st.cache_data(show_spinner=False)
-def load_data(nrows):
-    path = kagglehub.dataset_download( "sobhanmoosavi/us-accidents")
-    csv_path = os.path.join( path, "US_Accidents_March23.csv")
-    data = pd.read_csv( csv_path, nrows=nrows)
+def load_data(nrows=None):
+    data = pd.read_csv( "data/US_Accidents.csv", nrows=nrows)
     data = preprocess_data(data)
     return data
 
@@ -29,7 +21,7 @@ st.text(""" Este conjunto de datos contiene información sobre accidentes de tr�
 
 # Cargar datos
 with st.spinner("Cargando datos..."):
-    data = load_data(1000000)
+    data = load_data()
 
 # Mostrar datos
 #if st.checkbox('Mostrar datos', value=True):
