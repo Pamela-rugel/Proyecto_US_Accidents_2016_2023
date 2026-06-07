@@ -24,9 +24,41 @@ st.markdown("""
 [data-testid="stSidebar"]{
     background:linear-gradient(180deg,#061736 0%,#081f4d 100%);
 }
-[data-testid="stSidebar"] *{
-    color:white;
+/* Titulos y etiquetas del sidebar */
+[data-testid="stSidebar"] .stMarkdown,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3{
+    color:white !important;
 }
+
+/* Caja de filtros */
+[data-testid="stSidebar"] [data-baseweb="select"]{
+    background:white !important;
+    border-radius:8px;
+}
+
+/* Valor seleccionado */
+[data-testid="stSidebar"] [data-baseweb="select"] span{
+    color:#111827 !important;
+}
+
+/* Texto de búsqueda */
+[data-testid="stSidebar"] [data-baseweb="select"] input{
+    color:#111827 !important;
+}
+
+/* Multiselect tags */
+[data-testid="stSidebar"] [data-baseweb="tag"]{
+    background:#e5e7eb !important;
+}
+
+[data-testid="stSidebar"] [data-baseweb="tag"] span{
+    color:#111827 !important;
+}
+
 
 /* NO cambiar color global del contenido principal */
 h1,h2,h3,label,p,span{
@@ -90,7 +122,25 @@ STATE_NAMES = {
     "WI":"Wisconsin","WY":"Wyoming"
 }
 
+
 df["State_Name"] = df["State"].map(STATE_NAMES).fillna(df["State"])
+
+SEVERITY_LABELS = {
+    1: "Baja",
+    2: "Moderada",
+    3: "Alta",
+    4: "Fatal"
+}
+
+SEVERITY_COLORS = {
+    "Baja": "#22C55E",
+    "Moderada": "#EAB308",
+    "Alta": "#F97316",
+    "Fatal": "#DC2626"
+}
+
+df["Severity_Label"] = df["Severity"].map(SEVERITY_LABELS)
+
 
 
 # =====================================================
@@ -100,11 +150,16 @@ st.sidebar.image("assets/car.png", width=70)
 st.sidebar.markdown("## Accidentes de Tránsito EE.UU.")
 
 year = st.sidebar.selectbox("Año", ["Todos"] + sorted(df["Year"].unique().tolist()))
-# Estado se selecciona en el selector principal del dashboard
+
+selected_state_name = st.sidebar.selectbox(
+    "Estado",
+    ["Todos"] + sorted(df["State_Name"].dropna().unique().tolist())
+)
+
 weather = st.sidebar.selectbox("Condición climática", ["Todas"] + sorted(df["Weather_Group"].dropna().unique().tolist()))
 period = st.sidebar.selectbox("Momento del día", ["Todos","Madrugada","Mañana","Tarde","Noche"])
 hours = st.sidebar.slider("Rango horario",0,23,(0,23))
-severity = st.sidebar.multiselect("Severidad", sorted(df["Severity"].unique()), default=sorted(df["Severity"].unique()))
+severity = st.sidebar.multiselect("Nivel de severidad", ["Baja","Moderada","Alta","Fatal"], default=["Baja","Moderada","Alta","Fatal"])
 
 filtered = df.copy()
 
@@ -115,7 +170,7 @@ if year != "Todos":
 if weather != "Todas":
     filtered = filtered[filtered["Weather_Group"] == weather]
 
-filtered = filtered[filtered["Severity"].isin(severity)]
+filtered = filtered[filtered["Severity_Label"].isin(severity)]
 filtered = filtered[filtered["Hour"].between(hours[0], hours[1])]
 
 if period != "Todos":
@@ -126,14 +181,6 @@ if period != "Todos":
 # =====================================================
 st.title("Dashboard de Accidentes de Tránsito en EE.UU.")
 st.caption("Accidentes registrados entre 2016 y 2023")
-
-selected_state_name = st.selectbox(
-    "Explorar estado",
-    ["Todos"] + sorted(
-        df["State_Name"].dropna().unique().tolist()
-    )
-)
-
 
 if selected_state_name != "Todos":
     filtered = filtered[filtered["State_Name"] == selected_state_name]
@@ -200,7 +247,17 @@ c1,c2,c3,c4,c5 = st.columns(5)
 kpi_data = [
     ("🚗","Accidentes",f"{len(filtered):,}","#DBEAFE"),
     ("🗺️","Estados",filtered["State"].nunique(),"#DCFCE7"),
-    ("📊","Severidad",round(filtered["Severity"].mean(),2) if len(filtered) else 0,"#F3E8FF"),
+    (
+        "📊",
+        "Severidad",
+        (
+            SEVERITY_LABELS.get(
+                round(filtered["Severity"].mean()),
+                "N/D"
+            ) if len(filtered) else "-"
+        ),
+        "#FEE2E2"
+    ),
     ("🕒","Hora Pico",f"{int(filtered['Hour'].mode().iloc[0])}:00" if len(filtered) else "-","#FFEDD5"),
     ("📍","Duración",f"{round(filtered['Duration_Minutes'].mean(),1)} min" if len(filtered) else "-","#FEE2E2"),
 ]
@@ -215,8 +272,13 @@ for col, (icon, title, value, bg) in zip([c1,c2,c3,c4,c5], kpi_data):
                 padding:18px;
                 border:1px solid #e5e7eb;
                 min-height:110px;
+                display:flex;
+                flex-direction:column;
+                justify-content:center;
+                align-items:center;
+                text-align:center;
             ">
-                <div style="font-size:28px;">{icon}</div>
+                <div style="font-size:42px;">{icon}</div>
                 <div style="font-size:18px;font-weight:600;color:#334155;">
                     {title}
                 </div>
@@ -369,6 +431,15 @@ with b:
         aspect="auto",
         color_continuous_scale="RdYlBu_r"
     )
+
+    fig.update_traces(
+        hovertemplate=(
+            "<b>Día:</b> %{x}<br>" +
+            "<b>Hora:</b> %{y}:00<br>" +
+            "<b>Accidentes registrados:</b> %{z:,}<extra></extra>"
+        )
+    )
+
     fig = style_plotly(fig)
     st.plotly_chart(fig, use_container_width=True)
 
@@ -397,9 +468,12 @@ with a:
 
     table = pd.crosstab(
         filtered["Weather_Group"],
-        filtered["Severity"],
+        filtered["Severity_Label"],
         normalize="index"
     )
+
+    severity_order = ["Baja","Moderada","Alta","Fatal"]
+    table = table.reindex(columns=[c for c in severity_order if c in table.columns])
 
     fig = px.imshow(
         table,
@@ -501,7 +575,7 @@ with c:
     fig.update_layout(
         xaxis_title="Cantidad de accidentes",
         yaxis_title="",
-        coloraxis_colorbar_title="Severidad promedio"
+        coloraxis_colorbar_title="Severidad promedio (1-4)"
     )
 
     fig = style_plotly(fig)
