@@ -29,7 +29,7 @@ env/
 data/*.csv
 
 processed/*.csv
-processed/*.parquet
+
 
 # Mantener la carpeta en git
 !processed/.gitkeep

@@ -54,10 +54,17 @@ h1,h2,h3,label,p,span{
 
 @st.cache_data
 def load_data():
-    return pd.read_csv(
-        os.path.join("processed","US_Accidents_Processed.csv"),
-        parse_dates=["Start_Time"]
+
+    parquet_path = os.path.join(
+        "processed",
+        "US_Accidents_Processed.parquet"
     )
+
+    df = pd.read_parquet(
+        parquet_path
+    )
+
+    return df
 
 df = load_data()
 
