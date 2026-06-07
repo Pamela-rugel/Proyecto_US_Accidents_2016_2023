@@ -1,6 +1,10 @@
 import pandas as pd
 
+
+
+
 def preprocess_data(data):
+    print("PREPROCESSING EJECUTADO")
     # Casi todos sus valores nulos
     data = data.drop(
         columns=["End_Lng", "End_Lat"],
@@ -84,5 +88,96 @@ def preprocess_data(data):
                 ),
                 "Weather_Group"
             ] = group
+
+    # En el dataset US Accidents la severidad válida es 1-4
+    data = data[
+        data["Severity"].between(1, 4)
+    ]
+
+    # Eliminamos registros sin estado
+    if "State" in data.columns:
+        data = data.dropna(
+            subset=["State"]
+        )
+
+
+    # Año-Mes para análisis de evolución temporal
+    data["YearMonth"] = (
+        data["Start_Time"]
+        .dt.strftime("%Y-%m")
+    )
+
+    # FRANJA HORARIA
+
+    def obtener_franja_horaria(hora):
+
+        if hora < 6:
+            return "Madrugada"
+
+        elif hora < 12:
+            return "Mañana"
+
+        elif hora < 18:
+            return "Tarde"
+
+        return "Noche"
+
+    data["Time_Period"] = (
+        data["Hour"]
+        .apply(obtener_franja_horaria)
+    )
+
+    # ORDEN DE LOS DÍAS DE LA SEMANA
+    weekday_order = {
+        "Monday": 1,
+        "Tuesday": 2,
+        "Wednesday": 3,
+        "Thursday": 4,
+        "Friday": 5,
+        "Saturday": 6,
+        "Sunday": 7
+    }
+
+    data["Weekday_Order"] = (
+        data["Weekday"]
+        .map(weekday_order)
+    )
+
+
+    # COORDENADAS DISCRETIZADAS
+
+    data["Lat_Grid"] = (
+        data["Start_Lat"]
+        .round(1)
+    )
+
+    data["Lng_Grid"] = (
+        data["Start_Lng"]
+        .round(1)
+    )
+
+    # DURACIÓN DEL ACCIDENTE
+    if "End_Time" in data.columns:
+        data["End_Time"] = pd.to_datetime(
+            data["End_Time"],
+            format="mixed",
+            errors="coerce"
+        )
+
+        data["Duration_Minutes"] = (
+            (
+                data["End_Time"]
+                - data["Start_Time"]
+            )
+            .dt.total_seconds()
+            / 60
+        )
+
+        # Eliminamos duraciones negativas
+        data.loc[
+            data["Duration_Minutes"] < 0,
+            "Duration_Minutes"
+        ] = None
+
 
     return data

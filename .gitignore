@@ -1,3 +1,43 @@
-data/
-*.csv
-data/US_Accidents_March23.csv
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# Entornos virtuales
+# =========================
+venv/
+.venv/
+env/
+
+# =========================
+# Datos pesados
+# =========================
+data/*.csv
+
+processed/*.csv
+processed/*.parquet
+
+# Mantener la carpeta en git
+!processed/.gitkeep
+!data/.gitkeep
+
+# =========================
+# Archivos temporales
+# =========================
+*.log
+.DS_Store
+Thumbs.db
