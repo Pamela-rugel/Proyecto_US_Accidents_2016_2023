@@ -15,7 +15,7 @@ def main():
     print( f"Registros originales: {len(data):,}")
     print("Aplicando preprocessing...")
     data = preprocess_data(data)
-
+    print(data.columns.tolist())
     print( f"Registros procesados: {len(data):,}")
 
     os.makedirs( PROCESSED_FOLDER, exist_ok=True)
@@ -26,7 +26,7 @@ def main():
 
     print( f"Archivo generado: {PROCESSED_FILE}")
     
-    data.to_csv( PROCESSED_FILE.replace(".parquet", ".csv"), index=False)
+    #data.to_csv( PROCESSED_FILE.replace(".parquet", ".csv"), index=False)
 
 
 if __name__ == "__main__":

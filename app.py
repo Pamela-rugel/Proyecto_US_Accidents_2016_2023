@@ -99,8 +99,8 @@ def img_to_base64(path):
 
 @st.cache_data
 def load_data():
-    return pd.read_csv(
-        os.path.join("processed","US_Accidents_Processed.csv"),
+    return pd.read_parquet(
+        os.path.join("processed","US_Accidents_Processed.parquet"),
         parse_dates=["Start_Time"]
     )
 

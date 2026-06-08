@@ -26,7 +26,7 @@ env/
 # =========================
 # Datos pesados
 # =========================
-#data/*.csv
+data/*.csv
 
 #processed/*.csv
 
@@ -41,3 +41,5 @@ env/
 *.log
 .DS_Store
 Thumbs.db
+
+
