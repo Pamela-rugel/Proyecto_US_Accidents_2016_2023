@@ -86,8 +86,65 @@ h1,h2,h3,label,p,span{
     border-radius:12px;
 }
 
+            /* =========================================
+   ESTILO PARA LOS TABS (PESTAÑAS)
+========================================= */
+
+/* Ocultar la línea gris base de los tabs por defecto */
+[data-testid="stTabs"] {
+    border-bottom: none;
+}
+
+/* Estilo del contenedor de los botones de las pestañas */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 15px; /* Espacio entre las pestañas */
+    padding: 10px 0;
+}
+
+/* Estilo general de cada pestaña inactiva */
+.stTabs [data-baseweb="tab"] {
+    background-color: white;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    padding: 10px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.2s ease-in-out;
+}
+
+/* Color y peso del texto en pestañas */
+.stTabs [data-baseweb="tab"] p {
+    color: #4b5563; /* Gris medio */
+    font-weight: 500;
+    font-size: 16px;
+}
+
+/* Hover (al pasar el mouse) sobre las pestañas */
+.stTabs [data-baseweb="tab"]:hover {
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+/* Estilo de la pestaña ACTIVA */
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, #061736 0%, #081f4d 100%) !important;
+    border: none !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+}
+
+/* Color del texto en la pestaña ACTIVA */
+.stTabs [aria-selected="true"] p {
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+/* Eliminar la barra indicadora inferior por defecto de Streamlit */
+.stTabs [data-baseweb="tab-highlight"] {
+    background-color: transparent !important;
+}
+            
 </style>
 """, unsafe_allow_html=True)
+
 
 
 def img_to_base64(path):
@@ -143,13 +200,13 @@ SEVERITY_COLORS = {
 df["Severity_Label"] = df["Severity"].map(SEVERITY_LABELS)
 
 
-
 # =====================================================
 # SIDEBAR
 # =====================================================
 st.sidebar.image("assets/car.png", width=70)
 st.sidebar.markdown("## Accidentes de Tránsito EE.UU.")
 
+st.sidebar.markdown("### 📌 Filtros Principales")
 year = st.sidebar.selectbox("Año", ["Todos"] + sorted(df["Year"].unique().tolist()))
 
 selected_state_name = st.sidebar.selectbox(
@@ -157,21 +214,46 @@ selected_state_name = st.sidebar.selectbox(
     ["Todos"] + sorted(df["State_Name"].dropna().unique().tolist())
 )
 
-weather = st.sidebar.selectbox("Condición climática", ["Todas"] + sorted(df["Weather_Group"].dropna().unique().tolist()))
-period = st.sidebar.selectbox("Momento del día", ["Todos","Madrugada","Mañana","Tarde","Noche"])
-hours = st.sidebar.slider("Rango horario",0,23,(0,23))
-severity = st.sidebar.multiselect("Nivel de severidad", ["Baja","Moderada","Alta","Fatal"], default=["Baja","Moderada","Alta","Fatal"])
+st.sidebar.markdown("### 🚨 Nivel de Severidad")
 
+# 1. Creamos un diccionario para mapear la opción visual con el valor real de tu DataFrame
+opciones_severidad = {
+    "🟢 Baja": "Baja",
+    "🟡 Moderada": "Moderada",
+    "🟠 Alta": "Alta",
+    "🔴 Fatal": "Fatal"
+}
+
+# 2. Mostramos las opciones con los colores integrados
+severity_visual = st.sidebar.multiselect(
+    "Severidad", 
+    options=list(opciones_severidad.keys()), 
+    default=list(opciones_severidad.keys()),
+    label_visibility="collapsed"
+)
+
+# 3. Traducimos lo que el usuario seleccionó de vuelta a los valores originales ("Baja", "Moderada"...)
+severity_real = [opciones_severidad[opcion] for opcion in severity_visual]
+
+# Agrupamos los filtros secundarios para limpiar la vista
+with st.sidebar.expander("⚙️ Filtros Avanzados", expanded=False):
+    weather = st.selectbox("Condición climática", ["Todas"] + sorted(df["Weather_Group"].dropna().unique().tolist()))
+    period = st.selectbox("Momento del día", ["Todos","Madrugada","Mañana","Tarde","Noche"])
+    hours = st.slider("Rango horario",0,23,(0,23))
+
+# ==================== APLICACIÓN DE FILTROS ====================
 filtered = df.copy()
 
 if year != "Todos":
     filtered = filtered[filtered["Year"] == year]
 
+if selected_state_name != "Todos":
+    filtered = filtered[filtered["State_Name"] == selected_state_name]
 
 if weather != "Todas":
     filtered = filtered[filtered["Weather_Group"] == weather]
 
-filtered = filtered[filtered["Severity_Label"].isin(severity)]
+filtered = filtered[filtered["Severity_Label"].isin(severity_real)]
 filtered = filtered[filtered["Hour"].between(hours[0], hours[1])]
 
 if period != "Todos":
@@ -294,401 +376,335 @@ for col, (icon, title, value, bg) in zip([c1,c2,c3,c4,c5], kpi_data):
 # =====================================================
 # MAPA
 # =====================================================
-left,right = st.columns([4,1])
 
-with left:
-    st.subheader("Zonas geográficas de alta concentración")
+st.markdown("---") # Una línea divisoria sutil
+st.subheader(f"🗺️ Zonas de alta concentración: {selected_state_name if selected_state_name != 'Todos' else 'Estados Unidos'}")
 
-    map_df = filtered[["Start_Lat","Start_Lng"]].rename(
-        columns={"Start_Lat":"lat","Start_Lng":"lon"}
-    )
-
-    deck = pdk.Deck(
-        map_style="light",
-        layers=[
-            pdk.Layer(
-    "HeatmapLayer",
-    data=map_df.sample(
-        min(len(map_df), 50000),
-        random_state=42
-    ),
-
-    get_position="[lon, lat]",
-
-    opacity=0.95,
-
-    intensity=1.8,
-
-    threshold=0.03,
-
-    radiusPixels=40,
-
-    colorRange=[
-        [44, 123, 229],    # Azul
-        [0, 191, 255],     # Celeste
-        [50, 205, 50],     # Verde
-        [255, 215, 0],     # Amarillo
-        [255, 69, 0]       # Rojo
-    ]
+map_df = filtered[["Start_Lat","Start_Lng"]].rename(
+    columns={"Start_Lat":"lat","Start_Lng":"lon"}
 )
-        ],
-        initial_view_state=pdk.ViewState(
-            latitude=39,
-            longitude=-98,
-            zoom=3
+
+deck = pdk.Deck(
+    map_style="light",
+    layers=[
+        pdk.Layer(
+            "HeatmapLayer",
+            data=map_df.sample(
+                min(len(map_df), 50000),
+                random_state=42
+            ),
+            get_position="[lon, lat]",
+            opacity=0.95,
+            intensity=1.8,
+            threshold=0.03,
+            radiusPixels=40,
+            colorRange=[
+                [44, 123, 229],    # Azul (Baja densidad)
+                [0, 191, 255],     # Celeste
+                [50, 205, 50],     # Verde
+                [255, 215, 0],     # Amarillo
+                [255, 69, 0]       # Rojo (Alta densidad)
+            ]
         )
+    ],
+    initial_view_state=pdk.ViewState(
+        latitude=map_df["lat"].mean() if not map_df.empty else 39,
+        longitude=map_df["lon"].mean() if not map_df.empty else -98,
+        zoom=5 if selected_state_name != "Todos" else 3
     )
-    st.pydeck_chart(deck)
+)
+st.pydeck_chart(deck, use_container_width=True)
 
-with right:
+# Resumen de filtros activos (Elegante y en una sola línea debajo del mapa)
+active_filters = [f for f in [
+    f"Año: {year}" if year != "Todos" else None,
+    f"Clima: {weather}" if weather != "Todas" else None,
+    f"Momento: {period}" if period != "Todos" else None
+] if f is not None]
 
-    c_icon, c_title = st.columns([0.7,3])
+if active_filters:
+    st.caption(f"**Filtros activos adicionales:** {' | '.join(active_filters)}")
 
-    with c_icon:
-        st.image(
-            "assets/state.png",
-            width=60
-        )
+# =====================================================
+# PESTAÑAS DE NAVEGACIÓN
+# =====================================================
+tab_temporal, tab_geo, tab_clima = st.tabs([
+    "🕒 Análisis Temporal", 
+    "🗺️ Análisis Geográfico", 
+    "⛅ Factores Climáticos"
+])
+
+# --- PESTAÑA 1: TEMPORAL ---
+with tab_temporal:
+    a, b, c = st.columns(3)
     
-    with c_title:
+    with a:
+        st.subheader("Accidentes por hora")
+        hc = filtered["Hour"].value_counts().sort_index()
 
-        st.markdown("### Estado seleccionado")
+        fig = px.bar(
+            x=hc.index,
+            y=hc.values,
+            labels={"x":"Hora","y":"Accidentes"},
+            color_discrete_sequence=["#2563eb"]
+        )
+        fig = style_plotly(fig)
+        st.plotly_chart(fig, use_container_width=True)
 
-        if selected_state_name == "Todos":
+    with b:
+        st.subheader("Patrones día y hora")
 
-            st.markdown("### Estados Unidos")
+        heat = pd.crosstab(filtered["Hour"], filtered["Weekday"])
 
-            st.info(
-                "Mostrando todos los estados"
+        ordered_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+        day_map = {
+            "Monday":"Lunes",
+            "Tuesday":"Martes",
+            "Wednesday":"Miércoles",
+            "Thursday":"Jueves",
+            "Friday":"Viernes",
+            "Saturday":"Sábado",
+            "Sunday":"Domingo"
+        }
+
+        heat = heat.reindex(columns=[d for d in ordered_days if d in heat.columns])
+        heat.columns = [day_map.get(c,c) for c in heat.columns]
+
+        fig = px.imshow(
+            heat,
+            aspect="auto",
+            color_continuous_scale="RdYlBu_r"
+        )
+
+        fig.update_traces(
+            hovertemplate=(
+                "<b>Día:</b> %{x}<br>" +
+                "<b>Hora:</b> %{y}:00<br>" +
+                "<b>Accidentes registrados:</b> %{z:,}<extra></extra>"
+            )
+        )
+
+        fig = style_plotly(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with c:
+        st.subheader("Evolución temporal")
+
+        yearly = filtered.groupby("Year").size().reset_index(name="Accidentes")
+
+        fig = px.line(
+            yearly,
+            x="Year",
+            y="Accidentes",
+            markers=True
+        )
+        fig = style_plotly(fig)
+        fig.update_layout(xaxis_rangeslider_visible=True)
+        st.plotly_chart(fig, use_container_width=True)
+
+# --- PESTAÑA 2: GEOGRÁFICO ---
+with tab_geo:
+    a, b = st.columns(2)
+    
+    with a:
+        st.subheader("Severidad promedio por estado")
+
+        sev = (
+            filtered
+            .groupby(["State","State_Name"])["Severity"]
+            .mean()
+            .reset_index()
+        )
+
+        fig = px.choropleth(
+            sev,
+            locations="State",
+            locationmode="USA-states",
+            color="Severity",
+            color_continuous_scale="YlOrRd",
+            scope="usa",
+            hover_name="State_Name"
+        )
+
+        fig.update_traces(
+            hovertemplate="<b>%{hovertext}</b><br>Severidad promedio: %{z:.2f}<extra></extra>"
+        )
+
+        fig = style_plotly(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with b:
+        if selected_state_name != "Todos":
+            st.subheader("Top ciudades")
+            summary = (
+                filtered.groupby("City")
+                .agg(
+                    Accidentes=("City","count"),
+                    Severidad=("Severity","mean")
+                )
+                .reset_index()
+            )
+
+            # Ranking combinado: cantidad de accidentes + severidad
+            summary["Score"] = (
+                summary["Accidentes"] * summary["Severidad"]
+            )
+
+            summary = (
+                summary
+                .sort_values("Score", ascending=False)
+                .head(10)
             )
 
         else:
-
-            st.markdown(
-                f"### {selected_state_name}"
+            st.subheader("Top estados")
+            summary = (
+                filtered.groupby("State_Name")
+                .agg(
+                    Accidentes=("State_Name","count"),
+                    Severidad=("Severity","mean")
+                )
+                .sort_values("Accidentes", ascending=False)
+                .head(10)
+                .reset_index()
             )
+
+        entity_col = "City" if selected_state_name != "Todos" else "State_Name"
+
+        fig = px.bar(
+            summary.sort_values("Accidentes", ascending=True),
+            x="Accidentes",
+            y=entity_col,
+            orientation="h",
+            color="Severidad",
+            color_continuous_scale="YlOrRd",
+            text="Accidentes"
+        )
+
+        fig.update_traces(
+            textposition="outside",
+            hovertemplate=(
+                "<b>%{y}</b><br>" +
+                "Accidentes: %{x:,}<br>" +
+                "Severidad promedio: %{marker.color:.2f}<extra></extra>"
+            )
+        )
+
+        fig.update_layout(
+            xaxis_title="Cantidad de accidentes",
+            yaxis_title="",
+            coloraxis_colorbar_title="Severidad promedio (1-4)"
+        )
+
+        fig = style_plotly(fig)
+        st.plotly_chart(fig, use_container_width=True)
+
+# --- PESTAÑA 3: CLIMA ---
+with tab_clima:
+    a, b, c = st.columns(3)
     
-        
-        active_filters = []
+    with a:
+        st.subheader("Clima vs severidad")
 
-        if selected_state_name != "Todos":
-            active_filters.append(selected_state_name)
-
-        if year != "Todos":
-            active_filters.append(str(year))
-
-        if weather != "Todas":
-            active_filters.append(weather)
-
-        if period != "Todos":
-            active_filters.append(period)
-
-        if len(severity) < len(df["Severity"].unique()):
-            active_filters.append("Severidad: " + ",".join(map(str, severity)))
-
-        if active_filters:
-            st.caption("Filtros activos")
-            st.info(" | ".join(active_filters))
-
-# =====================================================
-# FILA 2
-# =====================================================
-a,b,c = st.columns(3)
-
-with a:
-    st.subheader("Accidentes por hora")
-    hc = filtered["Hour"].value_counts().sort_index()
-
-    fig = px.bar(
-        x=hc.index,
-        y=hc.values,
-        labels={"x":"Hora","y":"Accidentes"},
-        color_discrete_sequence=["#2563eb"]
-    )
-    fig = style_plotly(fig)
-    st.plotly_chart(fig, use_container_width=True)
-
-with b:
-    st.subheader("Patrones día y hora")
-
-    heat = pd.crosstab(filtered["Hour"], filtered["Weekday"])
-
-    ordered_days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
-    day_map = {
-        "Monday":"Lunes",
-        "Tuesday":"Martes",
-        "Wednesday":"Miércoles",
-        "Thursday":"Jueves",
-        "Friday":"Viernes",
-        "Saturday":"Sábado",
-        "Sunday":"Domingo"
-    }
-
-    heat = heat.reindex(columns=[d for d in ordered_days if d in heat.columns])
-    heat.columns = [day_map.get(c,c) for c in heat.columns]
-
-    fig = px.imshow(
-        heat,
-        aspect="auto",
-        color_continuous_scale="RdYlBu_r"
-    )
-
-    fig.update_traces(
-        hovertemplate=(
-            "<b>Día:</b> %{x}<br>" +
-            "<b>Hora:</b> %{y}:00<br>" +
-            "<b>Accidentes registrados:</b> %{z:,}<extra></extra>"
+        table = pd.crosstab(
+            filtered["Weather_Group"],
+            filtered["Severity_Label"],
+            normalize="index"
         )
-    )
 
-    fig = style_plotly(fig)
-    st.plotly_chart(fig, use_container_width=True)
+        severity_order = ["Baja","Moderada","Alta","Fatal"]
+        table = table.reindex(columns=[c for c in severity_order if c in table.columns])
 
-with c:
-    st.subheader("Evolución temporal")
+        fig = px.imshow(
+            table,
+            text_auto=".0%",
+            color_continuous_scale="YlOrRd"
+        )
+        fig = style_plotly(fig)
+        st.plotly_chart(fig, use_container_width=True)
 
-    yearly = filtered.groupby("Year").size().reset_index(name="Accidentes")
+    with b:
+        st.subheader("Accidentes por estación")
 
-    fig = px.line(
-        yearly,
-        x="Year",
-        y="Accidentes",
-        markers=True
-    )
-    fig = style_plotly(fig)
-    fig.update_layout(xaxis_rangeslider_visible=True)
-    st.plotly_chart(fig, use_container_width=True)
-
-# =====================================================
-# FILA 3
-# =====================================================
-a,b,c = st.columns(3)
-
-with a:
-    st.subheader("Clima vs severidad")
-
-    table = pd.crosstab(
-        filtered["Weather_Group"],
-        filtered["Severity_Label"],
-        normalize="index"
-    )
-
-    severity_order = ["Baja","Moderada","Alta","Fatal"]
-    table = table.reindex(columns=[c for c in severity_order if c in table.columns])
-
-    fig = px.imshow(
-        table,
-        text_auto=".0%",
-        color_continuous_scale="YlOrRd"
-    )
-    fig = style_plotly(fig)
-    st.plotly_chart(fig, use_container_width=True)
-
-with b:
-    st.subheader("Severidad promedio por estado")
-
-    sev = (
-        filtered
-        .groupby(["State","State_Name"])["Severity"]
-        .mean()
-        .reset_index()
-    )
-
-    fig = px.choropleth(
-        sev,
-        locations="State",
-        locationmode="USA-states",
-        color="Severity",
-        color_continuous_scale="YlOrRd",
-        scope="usa",
-        hover_name="State_Name"
-    )
-
-    fig.update_traces(
-        hovertemplate="<b>%{hovertext}</b><br>Severidad promedio: %{z:.2f}<extra></extra>"
-    )
-
-    fig = style_plotly(fig)
-    st.plotly_chart(fig, use_container_width=True)
-
-with c:
-
-    if selected_state_name != "Todos":
-
-        st.subheader("Top ciudades")
-
-        summary = (
-            filtered.groupby("City")
-            .agg(
-                Accidentes=("City","count"),
-                Severidad=("Severity","mean")
-            )
+        season = (
+            filtered["Season"]
+            .value_counts()
             .reset_index()
         )
 
-        # Ranking combinado: cantidad de accidentes + severidad
-        summary["Score"] = (
-            summary["Accidentes"] * summary["Severidad"]
+        season.columns = ["Season", "Accidentes"]
+        season_order = ["Winter", "Spring", "Summer", "Fall"]
+
+        season["Season"] = pd.Categorical(
+            season["Season"],
+            categories=season_order,
+            ordered=True
         )
 
-        summary = (
-            summary
-            .sort_values("Score", ascending=False)
+        season = season.sort_values("Season")
+
+        season_colors = {
+            "Winter": "#3B82F6",
+            "Spring": "#22C55E",
+            "Summer": "#EAB308",
+            "Fall": "#F97316"
+        }
+
+        fig = px.bar(
+            season,
+            x="Accidentes",
+            y="Season",
+            orientation="h",
+            color="Season",
+            color_discrete_map=season_colors
+        )
+
+        fig = style_plotly(fig)
+
+        fig.update_layout(
+            showlegend=False,
+            yaxis_title="",
+            xaxis_title="Cantidad de accidentes"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    with c:
+        st.subheader("Patrones climáticos (%)")
+
+        weather_state = pd.crosstab(
+            filtered["State_Name"],
+            filtered["Weather_Group"],
+            normalize="index"
+        ) * 100
+
+        top_states = (
+            filtered["State_Name"]
+            .value_counts()
             .head(10)
+            .index
         )
 
-    else:
-
-        st.subheader("Top estados")
-
-        summary = (
-            filtered.groupby("State_Name")
-            .agg(
-                Accidentes=("State_Name","count"),
-                Severidad=("Severity","mean")
-            )
-            .sort_values("Accidentes", ascending=False)
-            .head(10)
-            .reset_index()
-        )
-
-    entity_col = "City" if selected_state_name != "Todos" else "State_Name"
-
-    fig = px.bar(
-        summary.sort_values("Accidentes", ascending=True),
-        x="Accidentes",
-        y=entity_col,
-        orientation="h",
-        color="Severidad",
-        color_continuous_scale="YlOrRd",
-        text="Accidentes"
-    )
-
-    fig.update_traces(
-        textposition="outside",
-        hovertemplate=(
-            "<b>%{y}</b><br>" +
-            "Accidentes: %{x:,}<br>" +
-            "Severidad promedio: %{marker.color:.2f}<extra></extra>"
-        )
-    )
-
-    fig.update_layout(
-        xaxis_title="Cantidad de accidentes",
-        yaxis_title="",
-        coloraxis_colorbar_title="Severidad promedio (1-4)"
-    )
-
-    fig = style_plotly(fig)
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-# =====================================================
-# FILA 4
-# =====================================================
-a,b = st.columns(2)
-
-with a:
-    st.subheader("Accidentes por estación")
-
-    season = (
-        filtered["Season"]
-        .value_counts()
-        .reset_index()
-    )
-
-    season.columns = [
-        "Season",
-        "Accidentes"
-    ]
-
-    season_order = [
-        "Winter",
-        "Spring",
-        "Summer",
-        "Fall"
-    ]
-
-    season["Season"] = pd.Categorical(
-        season["Season"],
-        categories=season_order,
-        ordered=True
-    )
-
-    season = season.sort_values("Season")
-
-    season_colors = {
-        "Winter": "#3B82F6",
-        "Spring": "#22C55E",
-        "Summer": "#EAB308",
-        "Fall": "#F97316"
-    }
-
-    fig = px.bar(
-        season,
-        x="Accidentes",
-        y="Season",
-        orientation="h",
-        color="Season",
-        color_discrete_map=season_colors
-    )
-
-    fig = style_plotly(fig)
-
-    fig.update_layout(
-        showlegend=False,
-        yaxis_title="",
-        xaxis_title="Cantidad de accidentes"
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
-
-with b:
-    st.subheader("Patrones climáticos por estado (%)")
-
-    weather_state = pd.crosstab(
-        filtered["State_Name"],
-        filtered["Weather_Group"],
-        normalize="index"
-    ) * 100
-
-    top_states = (
-        filtered["State_Name"]
-        .value_counts()
-        .head(10)
-        .index
-    )
-
-    weather_state = weather_state.loc[
-        weather_state.index.intersection(top_states)
-    ]
-
-    fig = px.imshow(
-        weather_state,
-        text_auto=".0f",
-        aspect="auto",
-        color_continuous_scale=[
-            [0.0, "#3B82F6"],   # Azul
-            [0.33, "#22C55E"],  # Verde
-            [0.66, "#EAB308"],  # Amarillo
-            [1.0, "#F97316"]    # Naranja
+        weather_state = weather_state.loc[
+            weather_state.index.intersection(top_states)
         ]
-    )
 
-    fig.update_layout(
-        xaxis_title="Condición climática",
-        yaxis_title="Estado"
-    )
+        fig = px.imshow(
+            weather_state,
+            text_auto=".0f",
+            aspect="auto",
+            color_continuous_scale=[
+                [0.0, "#3B82F6"],   # Azul
+                [0.33, "#22C55E"],  # Verde
+                [0.66, "#EAB308"],  # Amarillo
+                [1.0, "#F97316"]    # Naranja
+            ]
+        )
 
-    fig = style_plotly(fig)
+        fig.update_layout(
+            xaxis_title="Condición climática",
+            yaxis_title="Estado"
+        )
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+        fig = style_plotly(fig)
+        st.plotly_chart(fig, use_container_width=True)
