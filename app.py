@@ -98,11 +98,12 @@ def img_to_base64(path):
         return ""
 
 @st.cache_data
+@st.cache_data
 def load_data():
-    return pd.read_parquet(
-        os.path.join("processed","US_Accidents_Processed.parquet"),
-        parse_dates=["Start_Time"]
-    )
+    df = pd.read_parquet( os.path.join( "processed", "US_Accidents_Processed.parquet"))
+    # Asegurar formato datetime
+    df["Start_Time"] = pd.to_datetime( df["Start_Time"], errors="coerce")
+    return df
 
 df = load_data()
 
