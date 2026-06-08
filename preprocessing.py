@@ -1,8 +1,5 @@
 import pandas as pd
 
-
-
-
 def preprocess_data(data):
     print("PREPROCESSING EJECUTADO")
     # Casi todos sus valores nulos

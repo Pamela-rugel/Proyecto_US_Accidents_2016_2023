@@ -17,8 +17,6 @@ csv_path = os.path.join(
 )
 
 
-
-
 print("Leyendo dataset...")
 
 df = pd.read_csv(
