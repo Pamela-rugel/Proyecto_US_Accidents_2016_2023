@@ -26,9 +26,9 @@ env/
 # =========================
 # Datos pesados
 # =========================
-data/*.csv
+#data/*.csv
 
-processed/*.csv
+#processed/*.csv
 
 
 # Mantener la carpeta en git
