@@ -184,7 +184,7 @@ div[data-testid="stRadio"] div[role="radiogroup"] {
 # =====================================================
 # 2. CARGA DE DATOS
 # =====================================================
-@st.cache_data
+@st.cache_data(ttl=0)
 def load_data():
     df = pd.read_parquet(os.path.join("processed", "US_Accidents_Processed.parquet"))
     df["Start_Time"] = pd.to_datetime(df["Start_Time"], errors="coerce")
