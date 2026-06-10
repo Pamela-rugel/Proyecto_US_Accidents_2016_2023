@@ -186,7 +186,8 @@ div[data-testid="stRadio"] div[role="radiogroup"] {
 # =====================================================
 @st.cache_data(ttl=0)
 def load_data():
-    df = pd.read_parquet(os.path.join("processed", "US_Accidents_Processed.parquet"))
+    url = "https://github.com/Pamela-rugel/Proyecto_US_Accidents_2016_2023/blob/main/processed/US_Accidents_Processed.parquet"
+    df = pd.read_parquet(url)
     df["Start_Time"] = pd.to_datetime(df["Start_Time"], errors="coerce")
     return df
 
