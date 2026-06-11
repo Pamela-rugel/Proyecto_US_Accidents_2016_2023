@@ -130,6 +130,16 @@ div[data-baseweb="select"] span {
     padding-bottom: 2rem;
 }
             
+/* Ocultar el botón que permite cerrar el sidebar */
+[data-testid="stSidebarCollapseButton"] {
+    display: none !important;
+}
+
+/* Opcional: Asegurar que el sidebar no reaccione a eventos de colapso */
+[data-testid="stSidebar"] {
+    transition: none !important;
+}
+            
  /* =========================================
    FORZAR RADIO BUTTONS EN UNA SOLA LÍNEA
 ========================================= */
@@ -427,6 +437,16 @@ with col_map_main:
                 labels={"Accidentes": "Total Accidentes", "Severidad_Media": "Severidad Promedio"}
             )
             
+            fig_map.add_scattergeo(
+                locations=map_agg["State"],
+                locationmode="USA-states",
+                text=map_agg["Accidentes"],
+                mode="text",
+                textfont=dict(size=9, color="white"),
+                showlegend=False,
+                hoverinfo="skip"
+            )
+
             fig_map.update_layout(
                 margin=dict(l=0, r=0, t=0, b=0),
                 height=515,
@@ -547,13 +567,10 @@ with tab_temporal:
                                 box-shadow:0 2px 4px rgba(0,0,0,0.05);
                                 width:100%;
                             ">
-                                Al analizar el comportamiento diario, se observa una media de
-                                <b>{int(media_diaria):,}</b> incidentes y una mediana de
-                                <b>{int(mediana_diaria):,}</b>. Durante este periodo,
-                                la jornada más tranquila reportó un mínimo de
-                                <b>{int(min_diario):,}</b> incidentes, mientras que el día más
-                                crítico alcanzó un pico máximo de
-                                <b>{int(max_diario):,}</b> colisiones.
+                                El análisis estadístico revela una media de <b>{int(media_diaria):,}</b> incidentes diarios, 
+                                con una mediana de <b>{int(mediana_diaria):,}</b>. La actividad fluctuó entre un mínimo de 
+                                <b>{int(min_diario):,}</b> registros y un pico máximo de <b>{int(max_diario):,}</b> colisiones 
+                                en la jornada más crítica.
                             </div>
                         </div>
                         """,
@@ -626,68 +643,30 @@ with tab_clima:
         # ACCIDENTES POR ESTACIÓN
         # -----------------------------------------------------
         with r1_c2:
-
             st.markdown("**Accidentes por Estación del Año**")
+            
+            # Asegurar que todas las estaciones existan aunque no tengan accidentes (rellenar con 0)
+            if not filtered.empty:
+                # Mapeo de estaciones
+                filtered_season = filtered.copy()
+                filtered_season["Season_Es"] = filtered_season["Season"].map(ESTACIONES_ES).fillna(filtered_season["Season"])
+                
+                # Crear conteo y asegurar que estén las 4 estaciones
+                season = filtered_season["Season_Es"].value_counts().reindex(["Invierno", "Primavera", "Verano", "Otoño"], fill_value=0).reset_index()
+                season.columns = ["Estación", "Accidentes"]
+            else:
+                season = pd.DataFrame({"Estación": ["Invierno", "Primavera", "Verano", "Otoño"], "Accidentes": [0, 0, 0, 0]})
 
-            filtered_season = filtered.copy()
-
-            filtered_season["Season_Es"] = (
-                filtered_season["Season"]
-                .map(ESTACIONES_ES)
-                .fillna(filtered_season["Season"])
-            )
-
-            season = (
-                filtered_season["Season_Es"]
-                .value_counts()
-                .reset_index()
-            )
-
-            season.columns = ["Estación", "Accidentes"]
-
-            season["Estación"] = pd.Categorical(
-                season["Estación"],
-                categories=[
-                    "Invierno",
-                    "Primavera",
-                    "Verano",
-                    "Otoño"
-                ],
-                ordered=True
-            )
-
-            season_colors = {
-                "Invierno": "#3B82F6",
-                "Primavera": "#22C55E",
-                "Verano": "#EAB308",
-                "Otoño": "#F97316"
-            }
+            season_colors = {"Invierno": "#3B82F6", "Primavera": "#22C55E", "Verano": "#EAB308", "Otoño": "#F97316"}
+            season["Label"] = season["Accidentes"].apply(lambda x: f"{x:,}")
 
             fig = px.bar(
-                season.sort_values("Estación"),
-                x="Accidentes",
-                y="Estación",
-                orientation="h",
-                color="Estación",
-                color_discrete_map=season_colors,
-                labels={
-                    "Estación": "Estación",
-                    "Accidentes": "Total Accidentes"
-                }
+                season, x="Accidentes", y="Estación", orientation="h", color="Estación",
+                color_discrete_map=season_colors, text="Label"
             )
-
-            fig.update_layout(
-                margin=dict(l=20, r=20, t=20, b=20),
-                height=420,
-                showlegend=False
-            )
-
-            st.plotly_chart(
-                style_plotly(fig),
-                use_container_width=True,
-                key="season_chart"
-            )
-
+            fig.update_traces(textposition="inside", insidetextanchor="end", texttemplate="%{text}  ", textfont=dict(color="white", size=12))
+            fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=420, showlegend=False, xaxis=dict(showticklabels=False, title=""), plot_bgcolor="white")
+            st.plotly_chart(style_plotly(fig), use_container_width=True, key="season_chart")
         # =====================================================
         # FILA 2
         # =====================================================
@@ -798,12 +777,10 @@ with tab_clima:
                 .value_counts(normalize=True)
                 .max() * 100
             )
-
-            estacion_pico = season.loc[
-                season["Accidentes"].idxmax(),
-                "Estación"
-            ]
-
+            
+            idx_max = season["Accidentes"].idxmax()
+            estacion_pico = season.loc[idx_max, "Estación"]
+            
             severidad_clima = (
                 filtered_weather
                 .groupby(weather_col)["Severity"]
